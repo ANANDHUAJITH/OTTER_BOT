@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Settings, Wifi, WifiOff, Bluetooth, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react"
 import { Joystick } from "@/components/joystick"
 import { SpeedSlider } from "@/components/speed-slider"
@@ -9,6 +9,23 @@ import { ToggleButton } from "@/components/toggle-button"
 import { Terminal } from "@/components/terminal"
 import { ScoreTerminal } from "@/components/score-terminal"
 import { SettingsModal } from "@/components/settings-modal"
+import { PWAInstall } from "@/components/pwa-install"
+
+let Haptics: any = null
+let ScreenOrientation: any = null
+let StatusBar: any = null
+
+if (typeof window !== "undefined") {
+  import("@capacitor/haptics").then((mod) => {
+    Haptics = mod.Haptics
+  })
+  import("@capacitor/screen-orientation").then((mod) => {
+    ScreenOrientation = mod.ScreenOrientation
+  })
+  import("@capacitor/status-bar").then((mod) => {
+    StatusBar = mod.StatusBar
+  })
+}
 
 export default function OtterBotController() {
   const [isConnected, setIsConnected] = useState(false)
@@ -39,11 +56,50 @@ export default function OtterBotController() {
     },
   })
 
+  useEffect(() => {
+    const lockOrientation = async () => {
+      try {
+        if (screen.orientation && "lock" in screen.orientation) {
+          await screen.orientation.lock("landscape")
+        }
+      } catch (e) {
+        // Orientation lock not supported
+      }
+    }
+
+    const enterFullscreen = () => {
+      const doc = document.documentElement
+      if (doc.requestFullscreen) {
+        doc.requestFullscreen().catch(() => {})
+      }
+    }
+
+    // Fullscreen on first touch
+    const handleFirstTouch = () => {
+      enterFullscreen()
+      lockOrientation()
+      document.removeEventListener("touchstart", handleFirstTouch)
+    }
+
+    document.addEventListener("touchstart", handleFirstTouch)
+    lockOrientation()
+
+    return () => document.removeEventListener("touchstart", handleFirstTouch)
+  }, [])
+
+  const triggerHaptic = (type: "light" | "medium" | "heavy" = "medium") => {
+    if ("vibrate" in navigator) {
+      const duration = type === "light" ? 10 : type === "medium" ? 25 : 50
+      navigator.vibrate(duration)
+    }
+  }
+
   const addLog = (message: string) => {
     setLogs((prev) => [...prev.slice(-10), `[${new Date().toLocaleTimeString()}] ${message}`])
   }
 
   const handleConnect = () => {
+    triggerHaptic("heavy")
     setIsConnected(!isConnected)
     addLog(isConnected ? "Disconnected from bot" : `Connected via ${settings.connectionType.toUpperCase()}`)
   }
@@ -59,10 +115,22 @@ export default function OtterBotController() {
       }
       setActiveControls(newControls)
 
-      if (newControls.forward && !activeControls.forward) addLog(`TX: ${settings.commands.forward}`)
-      if (newControls.backward && !activeControls.backward) addLog(`TX: ${settings.commands.backward}`)
-      if (newControls.left && !activeControls.left) addLog(`TX: ${settings.commands.left}`)
-      if (newControls.right && !activeControls.right) addLog(`TX: ${settings.commands.right}`)
+      if (newControls.forward && !activeControls.forward) {
+        triggerHaptic("light")
+        addLog(`TX: ${settings.commands.forward}`)
+      }
+      if (newControls.backward && !activeControls.backward) {
+        triggerHaptic("light")
+        addLog(`TX: ${settings.commands.backward}`)
+      }
+      if (newControls.left && !activeControls.left) {
+        triggerHaptic("light")
+        addLog(`TX: ${settings.commands.left}`)
+      }
+      if (newControls.right && !activeControls.right) {
+        triggerHaptic("light")
+        addLog(`TX: ${settings.commands.right}`)
+      }
     },
     [activeControls, settings.commands],
   )
@@ -73,11 +141,13 @@ export default function OtterBotController() {
   }, [])
 
   const handleSpinnerToggle = () => {
+    triggerHaptic("medium")
     setSpinnerActive(!spinnerActive)
     addLog(`TX: ${settings.commands.spinner}_${!spinnerActive ? "ON" : "OFF"}`)
   }
 
   const handleFlipperPress = () => {
+    triggerHaptic("heavy")
     setFlipperActive(true)
     addLog(`TX: ${settings.commands.flipper}_ON`)
   }
@@ -89,6 +159,8 @@ export default function OtterBotController() {
 
   return (
     <div className="w-screen h-screen overflow-hidden">
+      <PWAInstall />
+
       <div
         className="relative w-full h-full bg-cover bg-center bg-no-repeat"
         style={{
@@ -150,6 +222,7 @@ export default function OtterBotController() {
                 <div className="flex gap-3 mt-4">
                   <ControlButton
                     onPress={() => {
+                      triggerHaptic("medium")
                       setActiveControls((c) => ({ ...c, left: true }))
                       addLog(`TX: ${settings.commands.left}`)
                     }}
@@ -165,6 +238,7 @@ export default function OtterBotController() {
                   </ControlButton>
                   <ControlButton
                     onPress={() => {
+                      triggerHaptic("medium")
                       setActiveControls((c) => ({ ...c, right: true }))
                       addLog(`TX: ${settings.commands.right}`)
                     }}
@@ -212,6 +286,7 @@ export default function OtterBotController() {
                 <div className="flex gap-3 mt-6">
                   <ControlButton
                     onPress={() => {
+                      triggerHaptic("medium")
                       setActiveControls((c) => ({ ...c, backward: true }))
                       addLog(`TX: ${settings.commands.backward}`)
                     }}
@@ -227,6 +302,7 @@ export default function OtterBotController() {
                   </ControlButton>
                   <ControlButton
                     onPress={() => {
+                      triggerHaptic("medium")
                       setActiveControls((c) => ({ ...c, forward: true }))
                       addLog(`TX: ${settings.commands.forward}`)
                     }}
